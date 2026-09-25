@@ -1,0 +1,30 @@
+[package]
+name = "ic-auction"
+version = "0.1.0"
+edition = "2021"
+description = "Allocation mechanisms for scarce names and slots on the Internet Computer: Harberger tax with lazy settlement, sealed-bid second-price auctions, and an ICRC-2 cycles ledger client."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/DrJesseGlass/ic-auction"
+readme = "README.md"
+keywords = ["harberger", "auction", "vickrey", "icp", "cycles"]
+categories = ["algorithms", "wasm"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+sha2 = { version = "0.10", default-features = false }
+candid = { version = "0.10", optional = true }
+ic-cdk = { version = "0.20", optional = true }
+
+[features]
+default = []
+# Derive CandidType on the public types.
+candid = ["dep:candid"]
+# The ICRC-1/ICRC-2 ledger client (pull under an approval, pay, fund a
+# canister, read the fee). Needs ic-cdk, so only for use inside a canister.
+icrc = ["dep:ic-cdk", "dep:candid"]
+
+[dev-dependencies]
