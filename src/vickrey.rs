@@ -166,11 +166,10 @@ impl Auction {
         amount: u128,
         salt: &[u8],
     ) -> Result<(), String> {
-        if self.phase(now) != Phase::Reveal {
-            return Err(match self.phase(now) {
-                Phase::Commit => "the reveal phase has not started".to_string(),
-                _ => "the reveal phase is over".to_string(),
-            });
+        match self.phase(now) {
+            Phase::Reveal => {}
+            Phase::Commit => return Err("the reveal phase has not started".to_string()),
+            Phase::Closed => return Err("the reveal phase is over".to_string()),
         }
         let bid = self
             .bids
@@ -211,10 +210,10 @@ impl Auction {
                 .then(a.committed_ns.cmp(&b.committed_ns))
         });
         let winner = ranked.first().map(|b| b.bidder.clone());
-        let price = match (ranked.first(), ranked.get(1)) {
-            (Some(_), Some(second)) => second.revealed.unwrap_or(reserve).max(reserve),
-            (Some(_), None) => reserve,
-            (None, _) => 0,
+        // Everything ranked revealed at or above the reserve.
+        let price = match ranked.first() {
+            Some(_) => ranked.get(1).and_then(|b| b.revealed).unwrap_or(reserve),
+            None => 0,
         };
         let settlements = self
             .bids
