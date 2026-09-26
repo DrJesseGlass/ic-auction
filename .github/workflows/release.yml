@@ -21,7 +21,11 @@ jobs:
     needs: checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing after checkout uses git credentials; do not leave the
+          # token on disk for cargo, build scripts or publish to read.
+          persist-credentials: false
       - name: Tag matches Cargo.toml version
         run: |
           version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
