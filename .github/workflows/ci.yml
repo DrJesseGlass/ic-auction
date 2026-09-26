@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# Third-party actions are pinned to full commit SHAs (the release job
+# holds the crates.io token); the comment names the release. To update,
+# resolve the new tag with `git ls-remote --tags <repo>`.
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
@@ -19,12 +23,16 @@ jobs:
     name: fmt, clippy, test, docs, wasm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing after checkout uses git credentials; do not leave the
+          # token on disk for cargo, build scripts or publish to read.
+          persist-credentials: false
       # rust-toolchain.toml pins the toolchain and the wasm target; rustup
       # installs them on first use. The minimal profile has no fmt/clippy.
       - run: rustup toolchain install
       - run: rustup component add rustfmt clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo fmt --check
       - run: cargo clippy --all-features --all-targets
       - run: cargo test --no-default-features
@@ -40,11 +48,15 @@ jobs:
     name: minimum Rust (rust-version)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing after checkout uses git credentials; do not leave the
+          # token on disk for cargo, build scripts or publish to read.
+          persist-credentials: false
       - name: Install the rust-version toolchain
         run: |
           msrv=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
           rustup toolchain install "$msrv" --profile minimal
           echo "MSRV=$msrv" >> "$GITHUB_ENV"
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo +"$MSRV" test --all-features
