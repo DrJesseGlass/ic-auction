@@ -2,10 +2,14 @@
 name = "ic-auction"
 version = "0.1.0"
 edition = "2021"
+# Checked in CI; the pinned toolchain in rust-toolchain.toml is for development.
+rust-version = "1.88"
 description = "Allocation mechanisms for scarce names and slots on the Internet Computer: Harberger tax with lazy settlement, sealed-bid second-price auctions, and an ICRC-2 cycles ledger client."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/DrJesseGlass/ic-auction"
 readme = "README.md"
+documentation = "https://docs.rs/ic-auction"
+include = ["src/**/*.rs", "README.md", "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE"]
 keywords = ["harberger", "auction", "vickrey", "icp", "cycles"]
 categories = ["algorithms", "wasm"]
 

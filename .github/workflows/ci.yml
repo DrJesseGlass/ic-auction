@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  check:
+    name: fmt, clippy, test, docs, wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml pins the toolchain and the wasm target; rustup
+      # installs them on first use. The minimal profile has no fmt/clippy.
+      - run: rustup toolchain install
+      - run: rustup component add rustfmt clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --all-features --all-targets
+      - run: cargo test --no-default-features
+      - run: cargo test --features candid
+      - run: cargo test --all-features
+      - run: cargo doc --no-deps --all-features
+      - run: cargo build --features icrc --target wasm32-unknown-unknown
+      - name: ASCII only
+        run: "! grep -rnP '[^\\x00-\\x7F]' src README.md CHANGELOG.md Cargo.toml"
+      - run: cargo package
+
+  msrv:
+    name: minimum Rust (rust-version)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the rust-version toolchain
+        run: |
+          msrv=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
+          rustup toolchain install "$msrv" --profile minimal
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +"$MSRV" test --all-features

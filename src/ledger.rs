@@ -19,9 +19,12 @@ use candid::{CandidType, Nat, Principal};
 use ic_cdk::call::Call;
 use serde::Deserialize;
 
+/// An ICRC-1 account.
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct Account {
+    /// The principal that controls the account.
     pub owner: Principal,
+    /// 32 bytes, or None for the default subaccount.
     pub subaccount: Option<Vec<u8>>,
 }
 
@@ -143,6 +146,8 @@ impl Failure {
         matches!(self, Failure::Rejected(_) | Failure::Refused(_))
     }
 
+    /// A human-readable description, saying what the caller should
+    /// assume about the funds.
     pub fn message(&self) -> String {
         match self {
             Failure::Rejected(m) | Failure::Refused(m) => m.clone(),

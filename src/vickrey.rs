@@ -18,8 +18,12 @@ use sha2::{Digest, Sha256};
 
 const DOMAIN: &[u8] = b"ic-auction/vickrey/v1";
 
+/// A bidder's identity as opaque bytes (a principal's bytes, say).
 pub type Bidder = Vec<u8>;
 
+/// Phase lengths and reserve, fixed when an auction opens. Both phases
+/// should be positive: a zero reveal phase leaves no time to reveal, and
+/// every commitment would forfeit.
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Params {
@@ -31,32 +35,44 @@ pub struct Params {
     pub reserve: u128,
 }
 
+/// Where an auction stands at a given time.
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Phase {
+    /// Commitments accepted.
     #[serde(rename = "commit")]
     Commit,
+    /// Commitments opened; no new ones.
     #[serde(rename = "reveal")]
     Reveal,
+    /// Over: [`Auction::outcome`] is available.
     #[serde(rename = "closed")]
     Closed,
 }
 
+/// One bidder's commitment and, once opened, their amount.
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Bid {
+    /// Who committed.
     pub bidder: Bidder,
+    /// [`commitment`] of bidder, amount and salt.
     pub commitment: [u8; 32],
     /// Escrowed by the canister; a revealed amount may not exceed it.
     pub deposit: u128,
+    /// When the commitment was made; ties go to the earlier one.
     pub committed_ns: u64,
+    /// The amount, once revealed.
     pub revealed: Option<u128>,
 }
 
+/// A sealed-bid second-price auction: the whole state, to store as is.
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Auction {
+    /// Fixed at opening.
     pub params: Params,
+    /// When the commit phase started.
     pub opened_ns: u64,
     /// One per bidder; a second commitment from the same bidder replaces
     /// the first (the canister refunds the first deposit).
@@ -67,6 +83,7 @@ pub struct Auction {
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Settlement {
+    /// Whose deposit this settles.
     pub bidder: Bidder,
     /// Deposit returned (for the winner, deposit minus the price).
     pub refund: u128,
@@ -74,6 +91,8 @@ pub struct Settlement {
     pub forfeited: u128,
 }
 
+/// The result of a closed auction: who won, what they pay, and what every
+/// bidder is owed.
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Outcome {
@@ -82,11 +101,14 @@ pub struct Outcome {
     /// What the winner pays: the second-highest revealed bid, or the
     /// reserve when there is no second bid or it is below the reserve.
     pub price: u128,
+    /// One per commitment, in commitment order.
     pub settlements: Vec<Settlement>,
 }
 
 /// The commitment a bidder publishes: binds bidder, amount and salt so a
-/// reveal cannot be replayed by or for anyone else.
+/// reveal cannot be replayed by or for anyone else. The salt is what
+/// keeps the amount sealed: amounts are few enough to try one by one, so
+/// use at least 16 random bytes, fresh for every bid.
 pub fn commitment(bidder: &[u8], amount: u128, salt: &[u8]) -> [u8; 32] {
     let mut h = Sha256::new();
     h.update(DOMAIN);
@@ -99,6 +121,7 @@ pub fn commitment(bidder: &[u8], amount: u128, salt: &[u8]) -> [u8; 32] {
 }
 
 impl Auction {
+    /// Open an auction whose commit phase starts at `now`.
     pub fn open(params: Params, now: u64) -> Self {
         Auction {
             params,
@@ -107,14 +130,17 @@ impl Auction {
         }
     }
 
+    /// When the commit phase ends and the reveal phase starts.
     pub fn commit_until_ns(&self) -> u64 {
         self.opened_ns.saturating_add(self.params.commit_ns)
     }
 
+    /// When the reveal phase ends and the auction is closed.
     pub fn reveal_until_ns(&self) -> u64 {
         self.commit_until_ns().saturating_add(self.params.reveal_ns)
     }
 
+    /// The phase at `now`.
     pub fn phase(&self, now: u64) -> Phase {
         if now < self.commit_until_ns() {
             Phase::Commit
