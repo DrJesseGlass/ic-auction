@@ -130,10 +130,33 @@ impl Harberger {
     pub fn settle(&mut self, p: &Params, now: u64) -> (Status, u128) {
         let mut taken = 0u128;
         if self.lapsed_ns.is_none() && now > self.settled_ns {
-            let due = p.tax(self.price, now - self.settled_ns);
+            let elapsed = now - self.settled_ns;
+            let due = p.tax(self.price, elapsed);
             if due <= self.balance {
                 self.balance -= due;
                 taken = due;
+                // Advance over the least time whose tax is `due`, so the
+                // fraction the division floored away is carried to the next
+                // settle instead of forgiven (settling often enough, every
+                // read, would otherwise round each `due` to zero). Rounding
+                // up matters above one unit of tax per nanosecond: rounded
+                // down, a charged `due` could advance no time at all and a
+                // second settle at the same `now` would charge it again.
+                // The least such time is never more than `elapsed`, and what
+                // is left of the interval owes less than one unit, so a
+                // second settle at `now` takes nothing. The carry lives in
+                // whole nanoseconds, so above one unit per ns each settle
+                // still forgives under one unit, as plain flooring would.
+                let per_year = p.tax_per_year(self.price);
+                let paid_ns = if per_year == 0 {
+                    elapsed
+                } else {
+                    due.checked_mul(YEAR_NS)
+                        .and_then(|x| x.checked_add(per_year - 1))
+                        .map(|x| (x / per_year).min(elapsed as u128) as u64)
+                        .unwrap_or(elapsed)
+                };
+                self.settled_ns += paid_ns;
             } else {
                 // The balance ran out somewhere in the interval; find when.
                 let lapsed_at = match p.ns_until_spent(self.price, self.balance) {
@@ -143,8 +166,8 @@ impl Harberger {
                 taken = self.balance;
                 self.balance = 0;
                 self.lapsed_ns = Some(lapsed_at);
+                self.settled_ns = now;
             }
-            self.settled_ns = now;
         }
         (self.status(p, now), taken)
     }
@@ -163,19 +186,31 @@ impl Harberger {
     /// Add prepaid tax. A holding in grace comes back to active only if
     /// the balance afterwards covers one grace period of tax, as a fresh
     /// take must; otherwise dust would buy a fresh grace period each time.
-    pub fn top_up(&mut self, p: &Params, amount: u128, now: u64) -> Result<(), String> {
-        let after = self.balance.saturating_add(amount);
-        let min = p.min_deposit(self.price);
+    /// Settles to `now` first, so tax owed is never forgiven by a top-up,
+    /// and returns the tax that settle took (counted, like [`Self::settle`]'s,
+    /// only when the caller stores the result). A free holding cannot be
+    /// topped up: it is anyone's to take. On Err the holding is unchanged,
+    /// settlement included, so a refused top-up leaves nothing to store.
+    pub fn top_up(&mut self, p: &Params, amount: u128, now: u64) -> Result<u128, String> {
+        let mut next = self.clone();
+        let (status, taken) = next.settle(p, now);
+        if status == Status::Free {
+            return Err("the grace period is over: the item is free".to_string());
+        }
+        let after = next.balance.saturating_add(amount);
+        let min = p.min_deposit(next.price);
         if after < min {
             return Err(format!(
                 "balance after the deposit must cover one grace period of tax: at least {min} at this price, {} left",
-                self.balance
+                next.balance
             ));
         }
-        self.balance = after;
-        self.lapsed_ns = None;
-        self.settled_ns = now;
-        Ok(())
+        next.balance = after;
+        if next.lapsed_ns.take().is_some() {
+            next.settled_ns = now;
+        }
+        *self = next;
+        Ok(taken)
     }
 }
 
@@ -291,5 +326,79 @@ mod tests {
         assert_eq!(h.lapsed_ns, None);
         assert_eq!(h.settled_ns, 5);
         assert_eq!(h.status(&p, 6), Status::Active);
+    }
+
+    #[test]
+    fn frequent_settles_do_not_round_the_tax_away() {
+        let p = params();
+        let price = 100_000_000u128;
+        let per_year = p.tax_per_year(price);
+        let mut h = Harberger::new(price, per_year, 0);
+        // At this price one second of tax is under one unit.
+        let second = 1_000_000_000u64;
+        assert_eq!(p.tax(price, second), 0);
+        let mut total = 0;
+        let hour = 3_600u64;
+        for i in 1..=hour {
+            total += h.settle(&p, i * second).1;
+        }
+        assert_eq!(total, p.tax(price, hour * second));
+    }
+
+    #[test]
+    fn top_up_settles_first_and_refuses_free() {
+        let p = params();
+        let price = 1_000_000_000_000u128;
+        let per_year = p.tax_per_year(price);
+        let mut h = Harberger::new(price, per_year, 0);
+        let half = YEAR_NS as u64 / 2;
+        assert_eq!(h.top_up(&p, 1, half), Ok(per_year / 2));
+        assert_eq!(h.balance, per_year - per_year / 2 + 1);
+        let mut free = Harberger::new(price, 0, 0);
+        free.lapsed_ns = Some(0);
+        let before = free.clone();
+        assert!(free.top_up(&p, per_year, p.grace_ns + 1).is_err());
+        assert_eq!(free, before);
+    }
+
+    #[test]
+    fn a_refused_top_up_changes_nothing() {
+        let p = params();
+        let price = 1_000_000_000_000u128;
+        let per_year = p.tax_per_year(price);
+        // Half a year of tax owed, and a top-up too small to reach one
+        // grace period of tax afterwards.
+        let mut h = Harberger::new(price, per_year / 2 + 1, 0);
+        let before = h.clone();
+        let half = YEAR_NS as u64 / 2;
+        assert!(h.top_up(&p, 0, half).is_err());
+        assert_eq!(h, before);
+    }
+
+    #[test]
+    fn a_high_rate_settle_charges_an_instant_once() {
+        // 100% a year at the maximum price is about 31.7 units per ns, so
+        // a one-ns interval charges 31 units.
+        let p = Params {
+            rate_bps: 10_000,
+            ..params()
+        };
+        let mut h = Harberger::new(MAX_PRICE, MAX_PRICE, 0);
+        let (_, first) = h.settle(&p, 1);
+        assert_eq!(first, p.tax(MAX_PRICE, 1));
+        assert!(first > 0);
+        assert_eq!(h.settle(&p, 1).1, 0);
+        assert_eq!(h.settle(&p, 1).1, 0);
+        // Settling every ns: no interval is charged twice, and each settle
+        // forgives less than one unit (the carry lives in whole ns, and
+        // here one ns is worth more than a unit).
+        let mut total = first;
+        let n = 1_000u64;
+        for now in 2..=n {
+            total += h.settle(&p, now).1;
+            assert_eq!(h.settle(&p, now).1, 0);
+        }
+        let exact = p.tax(MAX_PRICE, n);
+        assert!(total <= exact && total + n as u128 > exact);
     }
 }
