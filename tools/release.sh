@@ -11,8 +11,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 new=${1:?usage: $0 <new-version>}
-if ! [[ $new =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "version must be MAJOR.MINOR.PATCH, got '$new'" >&2
+# Cargo's rules, checked before anything changes: three numeric parts, no
+# leading zeros, each within u64 (at most 19 digits keeps it there).
+part='(0|[1-9][0-9]{0,18})'
+if ! [[ $new =~ ^$part\.$part\.$part$ ]]; then
+  echo "version must be MAJOR.MINOR.PATCH with no leading zeros, got '$new'" >&2
   exit 1
 fi
 old=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
