@@ -114,9 +114,20 @@ src/vickrey.rs     Params, Auction, Bid, Outcome: commit, reveal, outcome
 src/ledger.rs      pull, pay, fund_self, fee, Failure (feature icrc)
 ```
 
-Releases are published from CI: bump `version` in Cargo.toml, add the
-CHANGELOG entry, merge, then push a tag `v<version>`. The release workflow
-checks the tag matches Cargo.toml, runs the checks, and publishes.
+Releases are published from CI. Describe the changes under
+`## [Unreleased]` in CHANGELOG.md as you go, then:
+
+```sh
+tools/release.sh 0.2.0   # bumps Cargo.toml and Cargo.lock, dates the
+                         # CHANGELOG, commits on release-v0.2.0
+```
+
+Push that branch, open a PR and merge it, then tag the merge on `main`
+with `v<version>` and push the tag. The release workflow checks the tag
+matches Cargo.toml and the CHANGELOG has the section, reruns CI,
+publishes to crates.io, and creates the GitHub release with that
+section as its notes. `v*` tags are protected: once pushed they cannot
+be moved or deleted, as a crates.io version cannot be replaced.
 
 ## License
 

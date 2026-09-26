@@ -34,10 +34,27 @@ jobs:
             exit 1
           fi
       - name: CHANGELOG has an entry for this version
-        run: |
-          version=${GITHUB_REF_NAME#v}
-          grep -q "^## \[${version}\]" CHANGELOG.md || { echo "no CHANGELOG entry for ${version}" >&2; exit 1; }
+        run: tools/changelog-section.sh "${GITHUB_REF_NAME#v}" > /dev/null
       - run: rustup toolchain install
       - run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  github-release:
+    name: GitHub release from the CHANGELOG
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create the release, notes from this version's CHANGELOG section
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools/changelog-section.sh "${GITHUB_REF_NAME#v}" > notes.md
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md \
+            --repo "$GITHUB_REPOSITORY"
