@@ -19,7 +19,7 @@ jobs:
     name: fmt, clippy, test, docs, wasm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # rust-toolchain.toml pins the toolchain and the wasm target; rustup
       # installs them on first use. The minimal profile has no fmt/clippy.
       - run: rustup toolchain install
@@ -40,7 +40,7 @@ jobs:
     name: minimum Rust (rust-version)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install the rust-version toolchain
         run: |
           msrv=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
