@@ -14,6 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
+/// One 365-day year in nanoseconds: the period `rate_bps` is quoted over.
 pub const YEAR_NS: u128 = 365 * 24 * 60 * 60 * 1_000_000_000;
 
 /// Prices above this are refused: 10^18 units, which keeps the tax over
@@ -48,6 +49,7 @@ impl Params {
         Ok(())
     }
 
+    /// Refuse a price below `min_price` or above [`MAX_PRICE`].
     pub fn check_price(&self, price: u128) -> Result<(), String> {
         if price < self.min_price {
             return Err(format!("price below the minimum of {}", self.min_price));
@@ -90,6 +92,7 @@ impl Params {
         self.tax(price, self.grace_ns)
     }
 
+    /// Refuse a deposit below [`Self::min_deposit`] at `price`.
     pub fn check_deposit(&self, price: u128, deposit: u128) -> Result<(), String> {
         let min = self.min_deposit(price);
         if deposit < min {
@@ -109,6 +112,8 @@ pub struct Harberger {
     pub price: u128,
     /// Prepaid tax as of `settled_ns`.
     pub balance: u128,
+    /// Tax is settled up to here. May trail the last settle by under one
+    /// unit's worth of time, which carries to the next settle.
     pub settled_ns: u64,
     /// When the balance ran out, if it has; the grace period runs from here.
     pub lapsed_ns: Option<u64>,
@@ -214,6 +219,7 @@ impl Harberger {
     }
 }
 
+/// Where a holding stands at a given time.
 #[cfg_attr(feature = "candid", derive(candid::CandidType))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -222,7 +228,10 @@ pub enum Status {
     Active,
     /// Balance ran out; the holder keeps the item until `until_ns`.
     #[serde(rename = "grace")]
-    Grace { until_ns: u64 },
+    Grace {
+        /// When the grace period ends and the item becomes free.
+        until_ns: u64,
+    },
     /// Grace over: anyone may take the item.
     #[serde(rename = "free")]
     Free,
