@@ -137,9 +137,10 @@ pub enum Failure {
 }
 
 impl Failure {
-    /// True when it is certain no cycles moved.
+    /// True when it is certain no cycles moved. False for FeeCharged (the
+    /// fee was burned) and Undecodable (anything may have moved).
     pub fn nothing_moved(&self) -> bool {
-        !matches!(self, Failure::Undecodable(_))
+        matches!(self, Failure::Rejected(_) | Failure::Refused(_))
     }
 
     pub fn message(&self) -> String {
