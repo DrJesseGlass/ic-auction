@@ -42,7 +42,7 @@ jobs:
       - run: cargo doc --no-deps --all-features
       - run: cargo build --features icrc --target wasm32-unknown-unknown
       - name: ASCII only
-        run: "! grep -rnP '[^\\x00-\\x7F]' src README.md CHANGELOG.md Cargo.toml"
+        run: "! grep -rnP '[^\\x00-\\x7F]' src README.md CHANGELOG.md SECURITY.md Cargo.toml .github"
       - run: cargo package
 
   msrv:

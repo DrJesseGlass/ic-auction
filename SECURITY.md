@@ -26,8 +26,9 @@ is in scope, in particular:
   and time owe, beyond the rounding the docs state (`Harberger::settle`);
   an interval charged twice; a `top_up` that forgives tax owed, or brings
   a holding back from grace for less than `Params::min_deposit`; a free
-  holding that becomes active again; a `Status` that says `Active` or
-  `Grace` for a holding whose balance and grace period have both run out;
+  holding that becomes active again; a `settle` that reports `Active` or
+  `Grace` for a holding whose balance and grace period have both run out
+  at the time it was given;
 - `vickrey`: a `reveal` accepted for an amount or salt other than the
   ones committed, or for a bidder other than the one who committed; two
   different (bidder, amount, salt) that hash to the same bytes
@@ -38,9 +39,9 @@ is in scope, in particular:
   commitment, or that together with the price exceed the deposits held;
 - `ledger` (`icrc` feature): a `Failure` for which `nothing_moved` is
   true when units moved or may have; a transfer sent without the fee the
-  caller pinned; a ledger reply decoded to a different amount, fee or
-  block index than the ledger sent; a `pull` that debits or credits an
-  account other than the payer's and this canister's;
+  caller pinned; a ledger reply decoded to a different fee or block index
+  than the ledger sent; a `pull` that debits or credits an account other
+  than the payer's and this canister's;
 - decoding and arithmetic: a serde or candid encoding that decodes to a
   different record than was encoded, or a panic or overflow in any of the
   above on input a caller cannot rule out (bidder bytes, salts, amounts,
@@ -70,6 +71,10 @@ is in scope, in particular:
   documents (`settled_ns` trailing `now` is the carry, not lost tax).
 - Every time is the `now` the caller passes. A canister that passes
   anything but `ic_cdk::api::time()` has chosen its own clock.
+- `Harberger::status` reads without settling, as its documentation says,
+  so it answers `Active` for a holding whose balance has run out since
+  the last `settle`. Acting on it instead of on what `settle` returns is
+  the caller's bug.
 - `ledger::fund_self` cannot pin a fee, because `withdraw` has no fee
   field; the caller checks the live fee first, as its documentation says.
   A ledger that itself misbehaves is the ledger's to fix.

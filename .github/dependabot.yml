@@ -41,9 +41,9 @@ updates:
       # and the canisters that consume them hold candid at 0.10.
       - dependency-name: candid
         update-types: [version-update:semver-major, version-update:semver-minor]
-      # ic-cdk: the `icrc` feature links into the consumer's canister, which
-      # must be on the same ic-cdk (ic-name-service holds 0.20); two copies
-      # in one module do not share a runtime.
+      # ic-cdk: the `icrc` feature links ic-cdk into the consumer's
+      # canister. A requirement the consumer is not on (ic-name-service
+      # holds 0.20) puts a second ic-cdk in its module.
       - dependency-name: ic-cdk
         update-types: [version-update:semver-major, version-update:semver-minor]
       # sha2 is not public API, but it is shared. candid's ic_principal
