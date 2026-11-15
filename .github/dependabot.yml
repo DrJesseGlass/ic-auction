@@ -1,0 +1,73 @@
+# Dependabot: security updates for every advisory against a dependency in
+# Cargo.lock (GitHub's advisory database includes RustSec), and routine
+# version updates on the schedules below. Each update is a pull request,
+# tested by ci.yml.
+#
+# This is a library, so Cargo.lock decides only what this repo's own tests
+# run against; what a consumer resolves is decided by the requirements in
+# Cargo.toml. A pull request that touches only Cargo.lock needs no release.
+# One that changes a requirement in Cargo.toml reaches consumers only with
+# a release (tools/release.sh, a CHANGELOG entry), and a release changes
+# the module hash of every canister that takes it (ic-name-service).
+#
+# Dependabot pushes its pull requests to branches named dependabot/<...>.
+# Git cannot create those while a branch named plainly `dependabot` exists
+# (a ref cannot be both a file and a directory), and Dependabot then opens
+# nothing, silently from the repo's side. Never name a branch `dependabot`;
+# the job log under Insights > Dependency graph > Dependabot shows the
+# failure when it happens.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      # Patch and minor bumps arrive as one pull request a week rather than
+      # one per crate; a major bump, or a security update, comes on its own.
+      cargo-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Each of these is a breaking release made by hand, not a weekly
+      # bump. At 0.x a minor bump is a breaking one, so only patches come
+      # through.
+      #
+      # candid: CandidType is derived on the public types (`candid`
+      # feature) and `ledger` takes candid's Principal in its signatures,
+      # and the canisters that consume them hold candid at 0.10.
+      - dependency-name: candid
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # ic-cdk: the `icrc` feature links into the consumer's canister, which
+      # must be on the same ic-cdk (ic-name-service holds 0.20); two copies
+      # in one module do not share a runtime.
+      - dependency-name: ic-cdk
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # sha2 is not public API, but it is shared. candid's ic_principal
+      # still requires sha2 0.10, so moving to 0.11 puts two copies of sha2
+      # and digest in the graph of every consumer with the `candid` or
+      # `icrc` feature on. It moves by hand when candid has moved; drop
+      # this entry then.
+      - dependency-name: sha2
+        update-types: [version-update:semver-major, version-update:semver-minor]
+
+  # The workflows' actions. ci.yml and release.yml pin them to full commit
+  # SHAs with the release named in a comment, and the release job holds the
+  # crates.io token; Dependabot moves the SHA and the comment together.
+  # Read what changed in the action before merging one of these.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+# Not covered, deliberately: rust-toolchain.toml (the development
+# toolchain) and rust-version in Cargo.toml (the minimum CI checks). Both
+# move by hand; raising rust-version is a change consumers see.

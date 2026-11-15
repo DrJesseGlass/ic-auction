@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 # Third-party actions are pinned to full commit SHAs (the release job
-# holds the crates.io token); the comment names the release. To update,
-# resolve the new tag with `git ls-remote --tags <repo>`.
+# holds the crates.io token); the comment names the release. Dependabot
+# moves the SHA and the comment together (.github/dependabot.yml); to do
+# it by hand, resolve the new tag with `git ls-remote --tags <repo>`.
 
 env:
   CARGO_TERM_COLOR: always
