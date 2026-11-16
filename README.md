@@ -98,6 +98,15 @@ paid for in cycles. Sibling crates:
 [ic-multisig](https://github.com/DrJesseGlass/ic-multisig) (K-of-N
 approvals), [ic-dev-kit-rs](https://github.com/DrJesseGlass/ic-dev-kit-rs).
 
+## Reporting
+
+A bug: https://github.com/DrJesseGlass/ic-auction/issues/new/choose.
+
+A security problem: privately, never in a public issue, at
+https://github.com/DrJesseGlass/ic-auction/security/advisories/new.
+[SECURITY.md](https://github.com/DrJesseGlass/ic-auction/blob/main/SECURITY.md)
+says what is in scope.
+
 ## Development
 
 ```sh

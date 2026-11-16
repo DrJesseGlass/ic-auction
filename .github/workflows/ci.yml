@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 # Third-party actions are pinned to full commit SHAs (the release job
-# holds the crates.io token); the comment names the release. To update,
-# resolve the new tag with `git ls-remote --tags <repo>`.
+# holds the crates.io token); the comment names the release. Dependabot
+# moves the SHA and the comment together (.github/dependabot.yml); to do
+# it by hand, resolve the new tag with `git ls-remote --tags <repo>`.
 
 env:
   CARGO_TERM_COLOR: always
@@ -41,7 +42,7 @@ jobs:
       - run: cargo doc --no-deps --all-features
       - run: cargo build --features icrc --target wasm32-unknown-unknown
       - name: ASCII only
-        run: "! grep -rnP '[^\\x00-\\x7F]' src README.md CHANGELOG.md Cargo.toml"
+        run: "! grep -rnP '[^\\x00-\\x7F]' src README.md CHANGELOG.md SECURITY.md Cargo.toml .github"
       - run: cargo package
 
   msrv:
