@@ -423,4 +423,25 @@ mod tests {
         assert_ne!(c, commitment(&bidder(1), 50, b"t"));
         assert_eq!(c, commitment(&bidder(1), 50, b"s"));
     }
+
+    // What the candid floor in Cargo.toml is for. Before 0.10.40 the
+    // decoder kept the first 32 bytes of a longer commitment and left the
+    // rest unread. Usually the leftover made the message fail later, but
+    // not always: here byte 33 has the LEB128 continuation bit set, so an
+    // old decoder read it and the deposit's one byte as a single nat and
+    // answered a deposit of 5 + 60 * 128 for a message that says 60.
+    #[cfg(feature = "candid")]
+    #[test]
+    fn a_commitment_longer_than_32_bytes_does_not_decode() {
+        use candid::{Decode, Encode};
+
+        let exact = Encode!(&vec![7u8; 32], &60u128).unwrap();
+        let (c, deposit) = Decode!(&exact, [u8; 32], u128).unwrap();
+        assert_eq!((c, deposit), ([7u8; 32], 60));
+
+        let mut long = vec![7u8; 33];
+        long[32] = 0x85;
+        let crafted = Encode!(&long, &60u128).unwrap();
+        assert!(Decode!(&crafted, [u8; 32], u128).is_err());
+    }
 }

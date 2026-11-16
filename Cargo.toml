@@ -20,7 +20,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 sha2 = { version = "0.10", default-features = false }
-candid = { version = "0.10", optional = true }
+# At least 0.10.40: earlier decoders could accept a vec longer than the
+# array it was decoded into and read what followed from the wrong offset,
+# and `Bid::commitment` is such an array (CHANGELOG).
+candid = { version = "0.10.40", optional = true }
 ic-cdk = { version = "0.20", optional = true }
 
 [features]
